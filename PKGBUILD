@@ -1,9 +1,9 @@
 # Maintainer: Juanjo <tu-email@example.com>
 # Contributor: Alex <itzAlex@github>
 
-pkgname=chatterino7-git
+pkgname=chatterino7-homies-git
 _pkgname=chatterino7
-pkgver=7.5.5.r0.g81e4e1c4f
+pkgver=2.5.5.r6272.gaf06f9cff
 pkgrel=1
 pkgdesc="Chat client for Twitch (Chatterino Homies - SevenTV v7.5.5 base)"
 arch=('x86_64')
@@ -27,10 +27,11 @@ makedepends=(
     'rapidjson'
 )
 optdepends=(
-    'qt6-wayland: Wayland support'
+    'qt6-wayland: Soporte nativo para Wayland'
+    'fcitx5-qt: Soporte para acentos y caracteres especiales en Wayland'
 )
-provides=("${_pkgname}=${pkgver}")
-conflicts=("${_pkgname}" 'chatterino2' 'chatterino2-bin' 'chatterino2-git')
+provides=("${_pkgname}=${pkgver}" 'chatterino')
+conflicts=("${_pkgname}" "${_pkgname}-git" 'chatterino2' 'chatterino2-bin' 'chatterino2-git')
 source=("${_pkgname}::git+https://github.com/Tankeeee2/Chatterino-Homies-Linux.git")
 sha256sums=('SKIP')
 
