@@ -154,7 +154,7 @@ SelectChannelWidget::SelectChannelWidget(int selected, QString type,
     }
 
     // Signals
-    QObject::connect(buttonBox, &QDialogButtonBox::accepted, [=]() {
+    QObject::connect(buttonBox, &QDialogButtonBox::accepted, [=, this]() {
         std::vector<std::string> channels;
 
         for (int row = 0; row < this->ui_.model_->rowCount(); row++)

@@ -3,7 +3,7 @@
 
 pkgname=chatterino7-homies-git
 _pkgname=chatterino7
-pkgver=2.5.5.r6272.gaf06f9cff
+pkgver=2.5.5.r6273.g12dcd1a7c
 pkgrel=1
 pkgdesc="Chat client for Twitch (Chatterino Homies - SevenTV v7.5.5 base)"
 arch=('x86_64')
