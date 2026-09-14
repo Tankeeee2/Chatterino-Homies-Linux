@@ -1,4 +1,4 @@
-# Maintainer: Juanjo <tu-email@example.com>
+# Maintainer: Juanjo <jucago705@gmail.com>
 # Contributor: Alex <itzAlex@github>
 
 pkgname=chatterino7-homies-git
