@@ -27,7 +27,7 @@ struct HighlightCheck {
         const MessageParseArgs &args,
         const std::vector<TwitchBadge> &twitchBadges, const QString &senderName,
         const QString &originalMessage, const MessageFlags &messageFlags,
-        bool self)>;
+        bool self, const QString &channel)>;
     Checker cb;
 };
 

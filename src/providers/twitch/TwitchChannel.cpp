@@ -32,6 +32,8 @@
 #include "providers/seventv/SeventvAPI.hpp"
 #include "providers/seventv/SeventvEmotes.hpp"
 #include "providers/seventv/SeventvEventAPI.hpp"
+#include "providers/homies/HomiesBadges.hpp"
+#include "providers/homies/HomiesEmotes.hpp"
 #include "providers/twitch/api/Helix.hpp"
 #include "providers/twitch/ChannelPointReward.hpp"
 #include "providers/twitch/eventsub/Controller.hpp"
@@ -124,6 +126,7 @@ TwitchChannel::TwitchChannel(const QString &name)
     , bttvEmotes_(std::make_shared<EmoteMap>())
     , ffzEmotes_(std::make_shared<EmoteMap>())
     , seventvEmotes_(std::make_shared<EmoteMap>())
+    , homiesEmotes_(std::make_shared<EmoteMap>())
     , mod_(getApp()->getTwitch()->isModeratorIn(name))
     , nextSharedChatSessionProbe_(QDateTime::currentDateTime())
 {
@@ -512,6 +515,43 @@ void TwitchChannel::setSeventvEmotes(std::shared_ptr<const EmoteMap> &&map)
     this->seventvEmotes_.set(std::move(map));
 }
 
+void TwitchChannel::refreshHomiesChannelEmotes(bool manualRefresh)
+{
+    if (!Settings::instance().enableHomiesChannelEmotes)
+    {
+        this->homiesEmotes_.set(EMPTY_EMOTE_MAP);
+        return;
+    }
+
+    HomiesEmotes::loadChannel(
+        this->weak_from_this(), this->roomId(),
+        [this](EmoteMap &&emoteMap) {
+            this->setHomiesEmotes(std::make_shared<const EmoteMap>(std::move(emoteMap)));
+        },
+        manualRefresh);
+}
+
+void TwitchChannel::setHomiesEmotes(std::shared_ptr<const EmoteMap> &&map)
+{
+    this->homiesEmotes_.set(std::move(map));
+}
+
+std::optional<EmotePtr> TwitchChannel::homiesEmote(const EmoteName &name) const
+{
+    auto emotes = this->homiesEmotes_.get();
+    auto it = emotes->find(name);
+    if (it != emotes->end())
+    {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+std::shared_ptr<const EmoteMap> TwitchChannel::homiesEmotes() const
+{
+    return this->homiesEmotes_.get();
+}
+
 void TwitchChannel::addQueuedRedemption(const QString &rewardId,
                                         const QString &originalContent,
                                         Communi::IrcMessage *message)
@@ -797,6 +837,8 @@ void TwitchChannel::roomIdChanged()
     this->refreshFFZChannelEmotes(false);
     this->refreshBTTVChannelEmotes(false);
     this->refreshSevenTVChannelEmotes(false);
+    this->refreshHomiesChannelEmotes(false);
+    getApp()->getHomiesBadges()->loadHomiesBadges();
     this->joinBttvChannel();
     this->listenSevenTVCosmetics();
     getApp()->getTwitchLiveController()->add(this->sharedFromThis());

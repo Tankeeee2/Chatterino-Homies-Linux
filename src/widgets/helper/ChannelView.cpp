@@ -1334,6 +1334,11 @@ bool ChannelView::hasSourceChannel() const
     return this->sourceChannel_ != nullptr;
 }
 
+void ChannelView::setModerationModeUsercard()
+{
+    this->moderationModeUsercard_ = true;
+}
+
 ChannelPtr ChannelView::effectiveSourceChannel() const
 {
     ChannelPtr base = this->underlyingChannel_;
@@ -1637,6 +1642,11 @@ MessageElementFlags ChannelView::getFlags() const
     if (!this->canReplyToMessages())
     {
         flags.unset(MessageElementFlag::ReplyButton);
+    }
+
+    if (this->moderationModeUsercard_)
+    {
+        flags.set(MessageElementFlag::ModeratorUsercard);
     }
 
     return flags;
@@ -2731,11 +2741,14 @@ void ChannelView::handleMouseClick(QMouseEvent *event,
                             // Insert @username into split input
                             const bool commaMention =
                                 getSettings()->mentionUsersWithComma;
+                            const bool mentionWithAt =
+                                getSettings()->mentionUsersWithAt;
                             const bool isFirstWord =
                                 split->getInput().isEditFirstWord();
                             auto userMention = formatUserMention(
-                                link.value, isFirstWord, commaMention);
-                            insertText("@" + userMention + " ");
+                                link.value, isFirstWord, commaMention,
+                                mentionWithAt);
+                            insertText(userMention + " ");
                         }
                         break;
 

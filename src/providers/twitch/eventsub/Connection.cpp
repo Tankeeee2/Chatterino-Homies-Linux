@@ -242,7 +242,8 @@ void Connection::onAutomodMessageHold(
 
     runInGuiThread([channel, messageText, userLogin, header, body] {
         auto [highlighted, highlightResult] = getApp()->getHighlights()->check(
-            {}, {}, userLogin, messageText, body->flags);
+            {}, {}, userLogin, messageText, body->flags,
+            MessagePlatform::AnyOrTwitch, channel->getName());
         if (highlighted)
         {
             MessageBuilder::triggerHighlights(

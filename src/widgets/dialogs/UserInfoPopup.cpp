@@ -681,6 +681,19 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
         logs->addWidget(this->ui_.noMessagesLabel);
         logs->addWidget(this->ui_.latestMessages);
         logs->setAlignment(this->ui_.noMessagesLabel, Qt::AlignHCenter);
+
+        std::ignore = this->userStateChanged_.connect([this]() mutable {
+            auto *twitchChannel =
+                dynamic_cast<TwitchChannel *>(this->channel_.get());
+
+            bool isModUsercard =
+                twitchChannel ? twitchChannel->hasModRights() : false;
+
+            if (isModUsercard)
+            {
+                this->ui_.latestMessages->setModerationModeUsercard();
+            }
+        });
     }
 
     // size grip

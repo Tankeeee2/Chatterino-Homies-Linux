@@ -1,0 +1,71 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Runs weekly on Mondays at 04:00 UTC
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    name: Check and sync with upstream SevenTV/chatterino7
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/SevenTV/chatterino7.git
+          git fetch upstream chatterino7
+
+      - name: Check for upstream changes
+        id: check
+        run: |
+          UPSTREAM_HEAD=$(git rev-parse upstream/chatterino7)
+          MERGE_BASE=$(git merge-base HEAD upstream/chatterino7)
+          echo "Upstream HEAD: $UPSTREAM_HEAD"
+          echo "Merge Base: $MERGE_BASE"
+          if [ "$UPSTREAM_HEAD" = "$MERGE_BASE" ]; then
+            echo "Already up to date with upstream."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "New commits found in upstream!"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Sync Branch and PR
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="upstream-sync-$(date +'%Y%m%d-%H%M%S')"
+          git checkout -b "$BRANCH_NAME"
+          if git merge upstream/chatterino7 --no-edit; then
+            git push origin "$BRANCH_NAME"
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "chore(sync): automated merge from upstream SevenTV/chatterino7" \
+              --body "Se han detectado nuevos commits en SevenTV/chatterino7 y se han fusionado limpiamente. Revisa y aprueba el PR para actualizar la rama principal."
+          else
+            echo "Conflict detected when merging upstream! Creating notification issue."
+            git merge --abort
+            gh issue create \
+              --title "⚠️ Conflicto al sincronizar con SevenTV/chatterino7 upstream" \
+              --body "La sincronización automática detectó nuevos cambios en el upstream SevenTV/chatterino7 pero hubo conflictos que requieren resolución manual."
+          fi

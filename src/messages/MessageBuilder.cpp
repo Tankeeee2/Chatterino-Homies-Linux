@@ -33,6 +33,7 @@
 #include "providers/seventv/SeventvBadges.hpp"
 #include "providers/seventv/SeventvEmotes.hpp"
 #include "providers/seventv/SeventvPersonalEmotes.hpp"
+#include "providers/homies/HomiesBadges.hpp"
 #include "providers/twitch/api/Helix.hpp"
 #include "providers/twitch/ChannelPointReward.hpp"
 #include "providers/twitch/TwitchAccount.hpp"
@@ -1827,6 +1828,7 @@ std::pair<MessagePtrMut, HighlightAlert> MessageBuilder::makeIrcMessage(
     builder->channelName = channel->getName();
 
     builder.parseMessageID(tags);
+    builder.appendIsMod(tags);
 
     MessageBuilder::parseRoomID(tags, twitchChannel);
     twitchChannel = builder.parseSharedChatInfo(tags, twitchChannel);
@@ -1881,6 +1883,12 @@ std::pair<MessagePtrMut, HighlightAlert> MessageBuilder::makeIrcMessage(
                 return false;
             }
 
+            auto currentUser = getApp()->getAccounts()->twitch.getCurrent();
+            if (ircMessage->nick() == currentUser->getUserName())
+            {
+                return true;
+            }
+
             if (tags.getOrEmpty("user-type") == "mod" &&
                 !userIsStaffOrBroadcaster)
             {
@@ -1902,6 +1910,7 @@ std::pair<MessagePtrMut, HighlightAlert> MessageBuilder::makeIrcMessage(
         builder.appendFfzBadges(twitchChannel, userID);
         builder.appendBttvBadges(userID);
         builder.appendSeventvBadges(userID);
+        builder.appendHomiesBadges(userID);
 
         builder.appendUsername(tags, args);
 
@@ -2228,6 +2237,20 @@ void MessageBuilder::parseMessageID(Communi::TagsRef tags)
     {
         this->message().id = *id;
     }
+}
+
+void MessageBuilder::appendIsMod(Communi::TagsRef tags)
+{
+    if (auto userType = tags.get("user-type"))
+    {
+        if (*userType == "mod")
+        {
+            this->message().isMod = true;
+            return;
+        }
+    }
+
+    this->message().isMod = false;
 }
 
 void MessageBuilder::appendOrEmplaceTextWithUser(
@@ -2678,7 +2701,8 @@ HighlightAlert MessageBuilder::parseHighlights(Communi::TagsRef tags,
     auto badges = parseBadgeTag(tags);
     auto [highlighted, highlightResult] = getApp()->getHighlights()->check(
         args, badges, this->message().loginName, originalMessage,
-        this->message().flags, this->message().platform);
+        this->message().flags, this->message().platform,
+        this->message().channelName);
 
     if (!highlighted)
     {
@@ -2994,6 +3018,22 @@ void MessageBuilder::appendSeventvBadges(const QString &userID)
 
         /// e.g. "7tv:NNYS 2024"
         this->message().externalBadges.emplace_back((*badge)->name.string);
+    }
+}
+
+void MessageBuilder::appendHomiesBadges(const QString &userID)
+{
+    if (auto badge = getApp()->getHomiesBadges()->getBadge({userID}))
+    {
+        this->emplace<BadgeElement>(*badge, MessageElementFlag::BadgeHomies);
+    }
+    if (auto badge = getApp()->getHomiesBadges()->getBadge2({userID}))
+    {
+        this->emplace<BadgeElement>(*badge, MessageElementFlag::BadgeHomies);
+    }
+    if (auto badge = getApp()->getHomiesBadges()->getBadge3({userID}))
+    {
+        this->emplace<BadgeElement>(*badge, MessageElementFlag::BadgeHomies);
     }
 }
 

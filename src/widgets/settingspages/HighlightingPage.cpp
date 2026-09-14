@@ -18,6 +18,7 @@
 #include "util/LayoutCreator.hpp"
 #include "widgets/dialogs/BadgePickerDialog.hpp"
 #include "widgets/dialogs/ColorPickerDialog.hpp"
+#include "widgets/dialogs/SelectChannelHighlightPopup.hpp"
 #include "widgets/helper/color/ColorItemDelegate.hpp"
 #include "widgets/helper/EditableModelView.hpp"
 
@@ -76,6 +77,8 @@ HighlightingPage::HighlightingPage()
                                 ->initialized(
                                     &getSettings()->highlightedMessages))
                         .getElement();
+                view->addSelectChannelHighlight();
+                view->addExcludeChannelHighlight();
                 view->addRegexHelpLink();
                 view->setTitles({"Pattern", "Show in\nMentions",
                                  "Flash\ntaskbar", "Enable\nregex",
@@ -103,10 +106,37 @@ HighlightingPage::HighlightingPage()
                             ColorType::SelfHighlight)});
                 });
 
-                QObject::connect(view->getTableView(), &QTableView::clicked,
-                                 [this, view](const QModelIndex &clicked) {
-                                     this->tableCellClicked(
-                                         clicked, view, HighlightTab::Messages);
+                std::ignore = view->selectChannelPressed.connect([this, view] {
+                    int selected = view->getTableView()
+                                       ->selectionModel()
+                                       ->currentIndex()
+                                       .row() -
+                                   10;
+
+                    auto selectUsernameWidget =
+                        new SelectChannelWidget(selected, "messages");
+
+                    selectUsernameWidget->show();
+                    selectUsernameWidget->raise();
+                });
+
+                std::ignore = view->excludeChannelPressed.connect([this, view] {
+                    int selected = view->getTableView()
+                                       ->selectionModel()
+                                       ->currentIndex()
+                                       .row() -
+                                   10;
+
+                    auto excludeChannelWidget =
+                        new ExcludeChannelWidget(selected, "messages");
+
+                    excludeChannelWidget->show();
+                    excludeChannelWidget->raise();
+                });
+
+                QObject::connect(view->getTableView()->selectionModel(), &QItemSelectionModel::currentChanged,
+                                 [this, view](const QModelIndex &current, const QModelIndex &/*previous*/) {
+                                     this->tableCellClicked(current, view, HighlightTab::Messages);
                                  });
             }
 
@@ -124,6 +154,10 @@ HighlightingPage::HighlightingPage()
                                 ->initialized(&getSettings()->highlightedUsers))
                         .getElement();
 
+                view->addSelectChannelHighlight();
+                view->addExcludeChannelHighlight();
+                view->disableSelectChannelButton();
+                view->disableExcludeChannelButton();
                 view->addRegexHelpLink();
                 view->getTableView()->horizontalHeader()->hideSection(
                     HighlightModel::Column::UseRegex);
@@ -158,10 +192,35 @@ HighlightingPage::HighlightingPage()
                             ColorType::SelfHighlight)});
                 });
 
-                QObject::connect(view->getTableView(), &QTableView::clicked,
-                                 [this, view](const QModelIndex &clicked) {
-                                     this->tableCellClicked(
-                                         clicked, view, HighlightTab::Users);
+                std::ignore = view->selectChannelPressed.connect([this, view] {
+                    int selected = view->getTableView()
+                                       ->selectionModel()
+                                       ->currentIndex()
+                                       .row() - 1;
+
+                    auto selectUsernameWidget =
+                        new SelectChannelWidget(selected, "users");
+
+                    selectUsernameWidget->show();
+                    selectUsernameWidget->raise();
+                });
+
+                std::ignore = view->excludeChannelPressed.connect([this, view] {
+                    int selected = view->getTableView()
+                                       ->selectionModel()
+                                       ->currentIndex()
+                                       .row() - 1;
+
+                    auto excludeChannelWidget =
+                        new ExcludeChannelWidget(selected, "users");
+
+                    excludeChannelWidget->show();
+                    excludeChannelWidget->raise();
+                });
+
+                QObject::connect(view->getTableView()->selectionModel(), &QItemSelectionModel::currentChanged,
+                                 [this, view](const QModelIndex &current, const QModelIndex &/*previous*/) {
+                                     this->tableCellClicked(current, view, HighlightTab::Users);
                                  });
             }
 
@@ -216,10 +275,9 @@ HighlightingPage::HighlightingPage()
                     }
                 });
 
-                QObject::connect(view->getTableView(), &QTableView::clicked,
-                                 [this, view](const QModelIndex &clicked) {
-                                     this->tableCellClicked(
-                                         clicked, view, HighlightTab::Badges);
+                QObject::connect(view->getTableView()->selectionModel(), &QItemSelectionModel::currentChanged,
+                                 [this, view](const QModelIndex &current, const QModelIndex &/*previous*/) {
+                                     this->tableCellClicked(current, view, HighlightTab::Badges);
                                  });
             }
 
@@ -369,6 +427,30 @@ void HighlightingPage::tableCellClicked(const QModelIndex &clicked,
     {
         case HighlightTab::Messages:
         case HighlightTab::Users: {
+            if (tab == HighlightTab::Messages)
+            {
+                if (clicked.row() >= 10)
+                {
+                    view->enableSelectChannelButton();
+                    view->enableExcludeChannelButton();
+                }
+                else
+                {
+                    view->disableSelectChannelButton();
+                    view->disableExcludeChannelButton();
+                }
+            }
+            else if (clicked.row() >= 1)
+            {
+                view->enableSelectChannelButton();
+                view->enableExcludeChannelButton();
+            }
+            else
+            {
+                view->disableSelectChannelButton();
+                view->disableExcludeChannelButton();
+            }
+
             using Column = HighlightModel::Column;
 
             if (clicked.column() == Column::SoundPath)

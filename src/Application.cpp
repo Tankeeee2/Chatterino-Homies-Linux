@@ -44,6 +44,8 @@
 #include "providers/chatterino/ChatterinoBadges.hpp"
 #include "providers/ffz/FfzBadges.hpp"
 #include "providers/seventv/SeventvBadges.hpp"
+#include "providers/homies/HomiesBadges.hpp"
+#include "providers/homies/HomiesEmotes.hpp"
 #include "providers/seventv/SeventvEventAPI.hpp"
 #include "providers/seventv/SeventvPaints.hpp"
 #include "providers/seventv/SeventvPersonalEmotes.hpp"
@@ -182,6 +184,8 @@ Application::Application(Settings &_settings, const Paths &paths,
     , ffzBadges(new FfzBadges)
     , bttvBadges(new BttvBadges)
     , seventvBadges(new SeventvBadges)
+    , homiesBadges(new HomiesBadges)
+    , homiesEmotes(new HomiesEmotes)
     , seventvPaints(new SeventvPaints)
     , seventvPersonalEmotes(new SeventvPersonalEmotes)
     , userData(new UserDataController(paths))
@@ -252,8 +256,11 @@ void Application::initialize(Settings &settings, const Modes &modes,
     this->bttvEmotes->loadEmotes();
     this->ffzEmotes->loadEmotes();
     this->seventvEmotes->loadGlobalEmotes();
+    this->homiesEmotes->loadEmotes();
 
     this->twitch->initialize();
+    getSettings()->enableHomiesChannelEmotes.connect(
+        [this]() { this->twitch->reloadAllHomiesChannelEmotes(); });
     this->kickChatServer->initialize();
 
     // Load live status
@@ -436,6 +443,13 @@ SeventvBadges *Application::getSeventvBadges()
     return this->seventvBadges.get();
 }
 
+HomiesBadges *Application::getHomiesBadges()
+{
+    assert(this->homiesBadges);
+
+    return this->homiesBadges.get();
+}
+
 IUserDataController *Application::getUserData()
 {
     assertInGuiThread();
@@ -577,6 +591,13 @@ SeventvEmotes *Application::getSeventvEmotes()
     assert(this->seventvEmotes);
 
     return this->seventvEmotes.get();
+}
+
+HomiesEmotes *Application::getHomiesEmotes()
+{
+    assert(this->homiesEmotes);
+
+    return this->homiesEmotes.get();
 }
 
 SeventvPersonalEmotes *Application::getSeventvPersonalEmotes()

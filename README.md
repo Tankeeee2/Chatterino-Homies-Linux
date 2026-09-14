@@ -1,8 +1,15 @@
-![chatterinoLogo](https://user-images.githubusercontent.com/41973452/272541622-52457e89-5f16-4c83-93e7-91866c25b606.png)
-Chatterino7 [![GitHub Actions Build (Windows, Ubuntu, MacOS)](https://github.com/seventv/chatterino7/actions/workflows/build.yml/badge.svg?branch=chatterino7)](https://github.com/SevenTV/chatterino7/actions?query=workflow%3ABuild+branch%3Achatterino7) [![Chocolatey Package](https://img.shields.io/chocolatey/v/chatterino7?include_prereleases)](https://chocolatey.org/packages/chatterino7)
+![chatterinoLogo](./resources/icon.png)
+Chatterino Homies (Linux Edition)
 ============
 
-Chatterino7 is a fork of Chatterino 2. This fork mainly contains features that aren't accepted into Chatterino 2, most notably 7TV subscriber features.
+**Chatterino Homies** combina la base más reciente de **SevenTV Chatterino 7** con las funcionalidades exclusivas de la comunidad **Homies**:
+
+### Funcionalidades de Homies
+- **Insignias Homies**: Badges de usuario personalizados (1, 2 y 3).
+- **Emotes Homies**: Emotes globales y de canal Homies integrados con autocompletado y selector en el menú de emotes.
+- **Filtros de canal en Highlighting**: Posibilidad de restringir o excluir resaltados (palabras clave o usuarios) a canales de Twitch específicos.
+- **Configuración Homies**: Pestaña dedicada en los ajustes de Chatterino con controles de emotes, insignias y formato de mención.
+- **Soporte completo 7TV**: Paints animados, avatares animados, emotes personales y emotes en alta resolución (4x).
 
 ### Features of Chatterino7
 

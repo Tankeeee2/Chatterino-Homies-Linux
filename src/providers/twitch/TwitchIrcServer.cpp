@@ -952,6 +952,16 @@ void TwitchIrcServer::reloadAllSevenTVChannelEmotes()
     });
 }
 
+void TwitchIrcServer::reloadAllHomiesChannelEmotes()
+{
+    this->forEachChannel([](const auto &chan) {
+        if (auto *channel = dynamic_cast<TwitchChannel *>(chan.get()))
+        {
+            channel->refreshHomiesChannelEmotes(false);
+        }
+    });
+}
+
 void TwitchIrcServer::forEachSeventvEmoteSet(
     const QString &emoteSetId, std::function<void(TwitchChannel &)> func)
 {

@@ -503,6 +503,11 @@ set(SOURCE_FILES
         providers/seventv/eventapi/Subscription.cpp
         providers/seventv/eventapi/Subscription.hpp
 
+        providers/homies/HomiesBadges.cpp
+        providers/homies/HomiesBadges.hpp
+        providers/homies/HomiesEmotes.cpp
+        providers/homies/HomiesEmotes.hpp
+
         providers/twitch/ChannelPointReward.cpp
         providers/twitch/ChannelPointReward.hpp
         providers/twitch/IrcMessageHandler.cpp
@@ -793,6 +798,8 @@ set(SOURCE_FILES
         widgets/dialogs/SelectChannelDialog.hpp
         widgets/dialogs/SelectChannelFiltersDialog.cpp
         widgets/dialogs/SelectChannelFiltersDialog.hpp
+        widgets/dialogs/SelectChannelHighlightPopup.cpp
+        widgets/dialogs/SelectChannelHighlightPopup.hpp
         widgets/dialogs/SettingsDialog.cpp
         widgets/dialogs/SettingsDialog.hpp
         widgets/dialogs/UpdateDialog.cpp
@@ -903,6 +910,8 @@ set(SOURCE_FILES
         widgets/settingspages/GeneralPageView.hpp
         widgets/settingspages/HighlightingPage.cpp
         widgets/settingspages/HighlightingPage.hpp
+        widgets/settingspages/HomiesPage.cpp
+        widgets/settingspages/HomiesPage.hpp
         widgets/settingspages/IgnoresPage.cpp
         widgets/settingspages/IgnoresPage.hpp
         widgets/settingspages/KeyboardSettingsPage.cpp

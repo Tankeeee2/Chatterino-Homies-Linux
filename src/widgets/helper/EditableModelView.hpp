@@ -6,6 +6,7 @@
 
 #include <pajlada/signals/signal.hpp>
 #include <QKeySequence>
+#include <QPushButton>
 #include <QWidget>
 
 #include <span>
@@ -26,10 +27,20 @@ public:
 
     QTableView *getTableView();
     QAbstractTableModel *getModel();
+    QPushButton *selectChannel;
+    QPushButton *excludeChannel;
 
     pajlada::Signals::NoArgSignal addButtonPressed;
+    pajlada::Signals::NoArgSignal selectChannelPressed;
+    pajlada::Signals::NoArgSignal excludeChannelPressed;
 
     void addCustomButton(QWidget *widget);
+    void addSelectChannelHighlight();
+    void addExcludeChannelHighlight();
+    void disableSelectChannelButton();
+    void enableSelectChannelButton();
+    void disableExcludeChannelButton();
+    void enableExcludeChannelButton();
     void addRegexHelpLink();
 
     bool filterSearchResults(const QString &query,

@@ -1516,6 +1516,22 @@ void TwitchModerationElement::addToContainer(MessageLayoutContainer &container,
             }
         }
     }
+
+    if (ctx.flags.has(MessageElementFlag::ModeratorUsercard))
+    {
+        QSizeF size{
+            container.getScale() * 16,
+            container.getScale() * 16,
+        };
+
+        auto action = ModerationAction("/delete {msg-id}");
+        if (const auto &image = action.getImage())
+        {
+            container.addElement(
+                (new ImageLayoutElement(*this, *image, size))
+                    ->setLink(Link(Link::UserAction, action.getAction())));
+        }
+    }
 }
 
 QJsonObject TwitchModerationElement::toJson() const

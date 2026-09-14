@@ -288,6 +288,7 @@ private:
                        TwitchChannel *twitchChannel,
                        bool trimSubscriberUsername);
     void parseMessageID(Communi::TagsRef tags);
+    void appendIsMod(Communi::TagsRef tags);
     void appendOrEmplaceTextWithUser(
         TwitchChannel *channel, const QString &userID,
         const QString &userLoginName, const QString &userDisplayName,
@@ -337,6 +338,7 @@ private:
     void appendFfzBadges(TwitchChannel *twitchChannel, const QString &userID);
     void appendBttvBadges(const QString &userID);
     void appendSeventvBadges(const QString &userID);
+    void appendHomiesBadges(const QString &userID);
 
     [[nodiscard]] static bool isIgnored(const QString &originalMessage,
                                         const QString &userID,

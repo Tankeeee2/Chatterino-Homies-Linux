@@ -198,6 +198,7 @@ public:
     void setSourceChannel(ChannelPtr sourceChannel);
     /// Checks if this view has a #sourceChannel
     bool hasSourceChannel() const;
+    void setModerationModeUsercard();
 
     /// The platform channel this view derives its messages from.
     ///
@@ -385,6 +386,7 @@ private:
     uint32_t pauseSelectionOffset_ = 0;
 
     std::optional<MessageElementFlags> overrideFlags_;
+    bool moderationModeUsercard_ = false;
     MessageLayoutPtr lastReadMessage_;
 
     ThreadGuard snapshotGuard_;

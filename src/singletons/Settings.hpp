@@ -348,6 +348,7 @@ public:
         "/appearance/badges/useCustomFfzVipBadges", true};
     BoolSetting showBadgesBttv = {"/appearance/badges/bttv", true};
     BoolSetting showBadgesSevenTV = {"/appearance/badges/seventv", true};
+    BoolSetting showBadgesHomies = {"/appearance/badges/homies", true};
     BoolSetting animateSevenTVBadges = {"/appearance/badges/animateSeventv",
                                         true};
     QSizeSetting lastPopupSize = {
@@ -450,6 +451,14 @@ public:
         "/experiments/useSmartEmoteCompletion",
         false,
     };
+    BoolSetting enableHomiesCompletion = {
+        "/behaviour/autocompletion/enableHomiesCompletion", true};
+    BoolSetting enable7TVCompletion = {
+        "/behaviour/autocompletion/enable7TVCompletion", true};
+    BoolSetting enableFFZCompletion = {
+        "/behaviour/autocompletion/enableFFZCompletion", true};
+    BoolSetting enableBTTVCompletion = {
+        "/behaviour/autocompletion/enableBTTVCompletion", true};
 
     BoolSetting enableSpellChecking = {
         "/behaviour/spellChecking/enabled",
@@ -524,6 +533,8 @@ public:
                                                true};
     BoolSetting enableSevenTVEventAPI = {"/emotes/seventv/eventapi", true};
     BoolSetting sendSevenTVActivity = {"/emotes/seventv/sendActivity", true};
+    BoolSetting enableHomiesGlobalEmotes = {"/emotes/homies/global", true};
+    BoolSetting enableHomiesChannelEmotes = {"/emotes/homies/channel", true};
 
     BoolSetting allowAvifImages = {"/emotes/allowAvif", true};
 

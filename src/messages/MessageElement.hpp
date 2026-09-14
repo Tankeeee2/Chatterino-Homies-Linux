@@ -119,15 +119,19 @@ enum class MessageElementFlag : int64_t {
     // - FFZ donator badge
     BadgeFfz = (1LL << 19),
 
+    // Slot 10: Homies
+    BadgeHomies = (1LL << 61),
+
     Badges = BadgeGlobalAuthority | BadgePredictions | BadgeChannelAuthority |
              BadgeSubscription | BadgeVanity | BadgeChatterino | BadgeSevenTV |
-             BadgeFfz | BadgeSharedChannel | BadgeBttv,
+             BadgeFfz | BadgeSharedChannel | BadgeBttv | BadgeHomies,
 
     ChannelName = (1LL << 20),
 
     BitsAmount = (1LL << 21),
 
     ModeratorTools = (1LL << 22),
+    ModeratorUsercard = (1LL << 60),
 
     EmojiImage = (1LL << 23),
     EmojiText = (1LL << 24),
