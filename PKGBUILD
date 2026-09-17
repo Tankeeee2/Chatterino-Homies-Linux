@@ -62,7 +62,8 @@ package() {
     cd "${_pkgname}"
 
     # Install binary
-    install -Dm755 build/bin/chatterino "${pkgdir}/usr/bin/chatterino"
+    install -Dm755 build/bin/chatterino-homies "${pkgdir}/usr/bin/chatterino-homies"
+    ln -sf chatterino-homies "${pkgdir}/usr/bin/chatterino"
 
     # Install desktop file
     install -Dm644 resources/com.chatterino.chatterino.desktop \

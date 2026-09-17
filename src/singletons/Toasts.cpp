@@ -350,7 +350,7 @@ void Toasts::ensureInitialized()
     {
         return;
     }
-    auto result = notify_init("Chatterino 7TV");
+    auto result = notify_init("Chatterino Homies");
 
     if (result == 0)
     {

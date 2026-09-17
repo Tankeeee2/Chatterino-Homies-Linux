@@ -1110,6 +1110,8 @@ if (BUILD_APP)
 
     set_target_directory_hierarchy(${EXECUTABLE_PROJECT})
 
+    set_target_properties(${EXECUTABLE_PROJECT} PROPERTIES OUTPUT_NAME "chatterino-homies")
+
     if (WIN32)
         if (WINDEPLOYQT_PATH)
             file(TO_CMAKE_PATH "${WINDEPLOYQT_PATH}" WINDEPLOYQT_PATH)
@@ -1301,7 +1303,7 @@ if (APPLE AND BUILD_APP)
     set_target_properties(${EXECUTABLE_PROJECT} PROPERTIES MACOSX_BUNDLE TRUE)
     set_target_properties(${EXECUTABLE_PROJECT}
         PROPERTIES
-        MACOSX_BUNDLE_BUNDLE_NAME "Chatterino 7TV"
+        MACOSX_BUNDLE_BUNDLE_NAME "Chatterino Homies"
         # Keep this for backwards compatibility
         MACOSX_BUNDLE_GUI_IDENTIFIER "app.7tv.chatterino7"
         MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}"

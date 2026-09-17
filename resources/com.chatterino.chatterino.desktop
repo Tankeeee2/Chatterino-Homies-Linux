@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Chatterino 7TV
+Name=Chatterino Homies
 Comment=Chat client for Twitch
-Exec=chatterino
+Exec=chatterino-homies
 Icon=com.chatterino.chatterino
 Terminal=false
 Categories=Network;InstantMessaging;
