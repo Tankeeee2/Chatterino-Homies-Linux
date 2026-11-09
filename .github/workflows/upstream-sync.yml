@@ -17,9 +17,8 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          submodules: recursive
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -42,10 +41,10 @@ jobs:
           echo "Merge Base: $MERGE_BASE"
           if [ "$UPSTREAM_HEAD" = "$MERGE_BASE" ]; then
             echo "Already up to date with upstream."
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
             echo "New commits found in upstream!"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Sync Branch and PR
@@ -53,19 +52,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           BRANCH_NAME="upstream-sync-$(date +'%Y%m%d-%H%M%S')"
           git checkout -b "$BRANCH_NAME"
+
           if git merge upstream/chatterino7 --no-edit; then
             git push origin "$BRANCH_NAME"
-            gh pr create \
+
+            # Creating PRs from workflows can be disabled at the repository
+            # level. The branch is already pushed, so treat that as a warning
+            # instead of failing the whole workflow.
+            if ! gh pr create \
               --base main \
               --head "$BRANCH_NAME" \
               --title "chore(sync): automated merge from upstream SevenTV/chatterino7" \
-              --body "Se han detectado nuevos commits en SevenTV/chatterino7 y se han fusionado limpiamente. Revisa y aprueba el PR para actualizar la rama principal."
+              --body "Se han detectado nuevos commits en SevenTV/chatterino7 y se han fusionado limpiamente. Revisa y aprueba el PR para actualizar la rama principal."; then
+              echo "::warning::No se pudo crear el PR automáticamente. La rama $BRANCH_NAME ya está publicada; crea el PR manualmente."
+            fi
           else
             echo "Conflict detected when merging upstream! Creating notification issue."
             git merge --abort
-            gh issue create \
+
+            if ! gh issue create \
               --title "⚠️ Conflicto al sincronizar con SevenTV/chatterino7 upstream" \
-              --body "La sincronización automática detectó nuevos cambios en el upstream SevenTV/chatterino7 pero hubo conflictos que requieren resolución manual."
+              --body "La sincronización automática detectó nuevos cambios en el upstream SevenTV/chatterino7 pero hubo conflictos que requieren resolución manual."; then
+              echo "::warning::No se pudo crear el issue de conflicto. Resuelve el merge con SevenTV/chatterino7 manualmente."
+            fi
           fi

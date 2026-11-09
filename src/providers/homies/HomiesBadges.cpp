@@ -13,9 +13,12 @@
 
 namespace chatterino {
 
-HomiesBadges::HomiesBadges()
+HomiesBadges::HomiesBadges(bool loadOnConstruct)
 {
-    this->loadHomiesBadges();
+    if (loadOnConstruct)
+    {
+        this->loadHomiesBadges();
+    }
 }
 
 boost::optional<EmotePtr> HomiesBadges::getBadge(const UserId &id)

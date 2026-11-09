@@ -485,17 +485,22 @@ EmotePtr KickChannel::getSubBadge(unsigned months)
     {
         return cIt->second;
     }
+
     auto baseIt = this->subBadgeImages_.lower_bound(months);
-    if (baseIt == this->subBadgeImages_.end())
+    if (this->subBadgeImages_.empty())
     {
         return {};
     }
-    if (baseIt->first != months)
+
+    if (baseIt == this->subBadgeImages_.begin())
     {
-        if (baseIt == this->subBadgeImages_.begin())
+        if (baseIt->first != months)
         {
             return {};
         }
+    }
+    else if (baseIt == this->subBadgeImages_.end() || baseIt->first != months)
+    {
         --baseIt;
     }
 
@@ -858,8 +863,8 @@ bool KickChannel::tryReplaceLastSeventvAddOrRemove(MessageFlag op,
 {
     auto now = QDateTime::currentDateTime();
     auto last = this->lastSeventvMessage_.lock();
-    if (!last || !last->flags.has(op) ||
-        last->serverReceivedTime < now.addSecs(-5) || last->loginName != actor)
+    if (!last || !last->flags.has(op) || last->timestamp < now.addSecs(-5) ||
+        last->loginName != actor)
     {
         return false;
     }

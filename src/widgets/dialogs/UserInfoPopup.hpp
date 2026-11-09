@@ -46,6 +46,7 @@ public:
     void setData(const QString &name, const ChannelPtr &channel);
     void setData(const QString &name, const ChannelPtr &contextChannel,
                  const ChannelPtr &openingChannel);
+    Split *getSplit() const;
 
 protected:
     void themeChangedEvent() override;
@@ -60,6 +61,7 @@ private:
 
     void loadAvatar(const QString &userID, const QString &pictureURL,
                     bool isKick);
+    void loadCurrentAvatar();
 
     void loadSevenTVAvatar(const QString &userID, bool isKick);
     void setSevenTVAvatar(const QString &filename, const QByteArray &format);
@@ -99,6 +101,7 @@ private:
     pajlada::Signals::NoArgSignal userStateChanged_;
 
     std::unique_ptr<pajlada::Signals::ScopedConnection> refreshConnection_;
+    std::unique_ptr<pajlada::Signals::ScopedConnection> replaceConnection_;
     std::unique_ptr<pajlada::Signals::ScopedConnection>
         userDataUpdatedConnection_;
 

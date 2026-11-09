@@ -3,7 +3,7 @@
 
 pkgname=chatterino7-homies-git
 _pkgname=chatterino7
-pkgver=2.5.5.r6273.g12dcd1a7c
+pkgver=2.5.6.r6398.gbadcb0945
 pkgrel=1
 pkgdesc="Chat client for Twitch (Chatterino Homies - SevenTV v7.5.5 base)"
 arch=('x86_64')
@@ -51,7 +51,6 @@ build() {
     cd "${_pkgname}"
     cmake -B build \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DBUILD_WITH_QTKEYCHAIN=OFF \
         -DBUILD_TESTS=OFF \
         -DBUILD_BENCHMARKS=OFF \
         -DCMAKE_BUILD_TYPE=Release

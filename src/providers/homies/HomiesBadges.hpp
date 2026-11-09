@@ -18,7 +18,9 @@ using EmotePtr = std::shared_ptr<const Emote>;
 class HomiesBadges
 {
 public:
-    HomiesBadges();
+    /// @param loadOnConstruct whether to immediately request the badge list
+    ///        from the network. Tests and mocks pass `false` here.
+    explicit HomiesBadges(bool loadOnConstruct = true);
     void loadHomiesBadges();
 
     boost::optional<EmotePtr> getBadge(const UserId &id);

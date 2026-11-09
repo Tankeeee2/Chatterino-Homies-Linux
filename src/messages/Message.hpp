@@ -64,8 +64,7 @@ struct Message {
     QString timeoutUser;
     QString channelName;
     QColor usernameColor;
-    bool isMod = false;
-    QDateTime serverReceivedTime;
+    QDateTime timestamp;
 
     /// List of Twitch badges associated with this message
     std::vector<TwitchBadge> twitchBadges;

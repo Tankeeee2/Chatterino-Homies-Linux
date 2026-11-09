@@ -3,6 +3,8 @@
 #include "Application.hpp"
 #include "common/Args.hpp"
 #include "common/Modes.hpp"
+#include "providers/homies/HomiesBadges.hpp"
+#include "providers/homies/HomiesEmotes.hpp"
 #include "singletons/Paths.hpp"
 #include "singletons/Updates.hpp"
 
@@ -42,6 +44,11 @@ public:
     const Args &getArgs() override
     {
         return this->args_;
+    }
+
+    const Modes &getModes() override
+    {
+        return this->modes_;
     }
 
     Theme *getThemes() override
@@ -175,6 +182,16 @@ public:
     {
         assert(!"getSeventvBadges was called without being initialized");
         return nullptr;
+    }
+
+    HomiesBadges *getHomiesBadges() override
+    {
+        return &this->homiesBadges_;
+    }
+
+    HomiesEmotes *getHomiesEmotes() override
+    {
+        return &this->homiesEmotes_;
     }
 
     IUserDataController *getUserData() override
@@ -319,6 +336,12 @@ public:
     Args args_;
     Modes modes_{args_};
     Paths paths_ = {args_, modes_};
+
+    /// Instances used by code paths that merely read badges/emotes, e.g.
+    /// MessageBuilder and the emote completion source. They are constructed
+    /// without issuing network requests, and simply stay empty.
+    HomiesBadges homiesBadges_{false};
+    HomiesEmotes homiesEmotes_;
 };
 
 }  // namespace chatterino::mock

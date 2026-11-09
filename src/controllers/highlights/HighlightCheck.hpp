@@ -5,13 +5,15 @@
 #pragma once
 
 #include "common/FlagsEnum.hpp"
+#include "controllers/filters/lang/expressions/Expression.hpp"
+#include "messages/Message.hpp"
 
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <vector>
 
-class QString;
+#include <QString>
 
 namespace chatterino {
 
@@ -22,13 +24,22 @@ class TwitchBadge;
 enum class MessageFlag : std::int64_t;
 using MessageFlags = FlagsEnum<MessageFlag>;
 
-struct HighlightCheck {
-    using Checker = std::function<std::optional<HighlightResult>(
-        const MessageParseArgs &args,
-        const std::vector<TwitchBadge> &twitchBadges, const QString &senderName,
-        const QString &originalMessage, const MessageFlags &messageFlags,
-        bool self, const QString &channel)>;
-    Checker cb;
+struct HighlightCheckParams {
+    const MessageParseArgs &args;
+    const std::vector<TwitchBadge> &twitchBadges;
+    const QString &senderName;
+    const QString &originalMessage;
+    const MessageFlags &messageFlags;
+    bool self;
+    filters::RunContext runContext;
+    MessagePlatform platform = MessagePlatform::AnyOrTwitch;
+
+    /// Name of the channel this message belongs to (without the leading '#').
+    /// Used to filter channel-specific highlights.
+    QString channel;
 };
+
+using HighlightCheck = std::function<std::optional<HighlightResult>(
+    const HighlightCheckParams &params)>;
 
 }  // namespace chatterino
