@@ -840,7 +840,6 @@ void TwitchChannel::roomIdChanged()
     this->refreshBTTVChannelEmotes(false);
     this->refreshSevenTVChannelEmotes(false);
     this->refreshHomiesChannelEmotes(false);
-    getApp()->getHomiesBadges()->loadHomiesBadges();
     this->joinBttvChannel();
     this->listenSevenTVCosmetics();
     getApp()->getTwitchLiveController()->add(this->sharedFromThis());
@@ -2759,6 +2758,11 @@ void TwitchChannel::refreshSharedChatSessionState()
 
 void TwitchChannel::refreshPinnedMessage()
 {
+    if (this->roomId().isEmpty())
+    {
+        return;
+    }
+
     auto currentAccount = getApp()->getAccounts()->twitch.getCurrent();
     if (!currentAccount || currentAccount->isAnon())
     {
