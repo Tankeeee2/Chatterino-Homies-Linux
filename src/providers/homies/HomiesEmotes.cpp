@@ -12,9 +12,16 @@
 #include "providers/twitch/TwitchChannel.hpp"
 #include "singletons/Settings.hpp"
 
+#include "util/PostToThread.hpp"
+
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QThread>
+
+#include <chrono>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace chatterino {
 namespace {
@@ -71,7 +78,7 @@ namespace {
     {
         auto emotes = EmoteMap();
 
-        for (const auto &jsonEmote : jsonEmotes)
+        for (const auto jsonEmote : jsonEmotes)
         {
             auto emote = createEmote(jsonEmote, true);
             emotes[emote.name] =
@@ -81,8 +88,7 @@ namespace {
         return {Success, std::move(emotes)};
     }
 
-    EmoteMap parseChannelEmotes(const QJsonObject &root,
-                                const QString &channelName)
+    EmoteMap parseChannelEmotes(const QJsonObject &root)
     {
         auto emotes = EmoteMap();
 
@@ -97,6 +103,57 @@ namespace {
         }
 
         return emotes;
+    }
+
+    struct PendingChannelRequest {
+        std::weak_ptr<Channel> channel;
+        QString channelId;
+        std::function<void(EmoteMap &&)> callback;
+        bool manualRefresh;
+    };
+
+    struct HomiesChannelCache {
+        static constexpr auto CACHE_TTL = std::chrono::minutes(5);
+
+        std::mutex mutex;
+        bool inFlight = false;
+        std::chrono::steady_clock::time_point lastFetched{};
+        std::unordered_map<QString, QJsonObject> channelEmotes;
+        std::vector<PendingChannelRequest> pending;
+    };
+
+    HomiesChannelCache &getChannelCache()
+    {
+        static HomiesChannelCache cache;
+        return cache;
+    }
+
+    void finishChannelRequest(PendingChannelRequest &&req, EmoteMap &&emoteMap)
+    {
+        bool hasEmotes = !emoteMap.empty();
+        postToGuiThread([req = std::move(req), emoteMap = std::move(emoteMap),
+                         hasEmotes]() mutable {
+            auto shared = req.channel.lock();
+            if (!shared)
+            {
+                return;
+            }
+            if (hasEmotes)
+            {
+                req.callback(std::move(emoteMap));
+            }
+            if (req.manualRefresh)
+            {
+                if (hasEmotes)
+                {
+                    shared->addSystemMessage("Homies channel emotes reloaded.");
+                }
+                else
+                {
+                    shared->addSystemMessage(CHANNEL_HAS_NO_EMOTES);
+                }
+            }
+        });
     }
 }  // namespace
 
@@ -131,6 +188,7 @@ void HomiesEmotes::loadEmotes()
     }
 
     NetworkRequest(apiUrl)
+        .concurrent()
         .onSuccess([this](NetworkResult result) -> Outcome {
             QJsonArray parsedEmotes = result.parseJson()
                                           .value("data")
@@ -152,51 +210,134 @@ void HomiesEmotes::loadChannel(std::weak_ptr<Channel> channel,
                                std::function<void(EmoteMap &&)> callback,
                                bool manualRefresh)
 {
-    NetworkRequest(apiUrl)
-        .onSuccess([callback = std::move(callback), channel, channelId,
-                    manualRefresh](NetworkResult result) -> Outcome {
-            QJsonObject parsedEmotes = result.parseJson()
-                                           .value("data")
-                                           .toObject()
-                                           .value("channel_emotes")
-                                           .toObject()
-                                           .value(channelId)
-                                           .toObject();
+    auto &cache = getChannelCache();
+    PendingChannelRequest req{
+        .channel = std::move(channel),
+        .channelId = channelId,
+        .callback = std::move(callback),
+        .manualRefresh = manualRefresh,
+    };
 
-            auto emoteMap = parseChannelEmotes(parsedEmotes, channelId);
-            bool hasEmotes = !emoteMap.empty();
-
-            if (hasEmotes)
+    bool shouldFetch = false;
+    std::optional<QJsonObject> cachedChannelObj;
+    {
+        std::lock_guard<std::mutex> lock(cache.mutex);
+        auto now = std::chrono::steady_clock::now();
+        if (!manualRefresh &&
+            cache.lastFetched.time_since_epoch().count() > 0 &&
+            (now - cache.lastFetched) < HomiesChannelCache::CACHE_TTL)
+        {
+            auto it = cache.channelEmotes.find(channelId);
+            if (it != cache.channelEmotes.end())
             {
-                callback(std::move(emoteMap));
-            }
-            if (auto shared = channel.lock(); manualRefresh)
-            {
-                if (hasEmotes)
-                {
-                    shared->addSystemMessage("Homies channel emotes reloaded.");
-                }
-                else
-                {
-                    shared->addSystemMessage(CHANNEL_HAS_NO_EMOTES);
-                }
-            }
-            return Success;
-        })
-        .onError([channelId, channel, manualRefresh](NetworkResult result) {
-            auto shared = channel.lock();
-            if (!shared)
-                return;
-            if (result.status() == 400)
-            {
-                if (manualRefresh)
-                    shared->addSystemMessage(CHANNEL_HAS_NO_EMOTES);
+                cachedChannelObj = it->second;
             }
             else
             {
-                shared->addSystemMessage("Failed to fetch Homies channel "
-                                         "emotes. (unknown error)");
+                cachedChannelObj = QJsonObject{};
             }
+        }
+        else
+        {
+            cache.pending.push_back(std::move(req));
+            if (!cache.inFlight)
+            {
+                cache.inFlight = true;
+                shouldFetch = true;
+            }
+        }
+    }
+
+    if (cachedChannelObj.has_value())
+    {
+        auto emoteMap = parseChannelEmotes(*cachedChannelObj);
+        finishChannelRequest(std::move(req), std::move(emoteMap));
+        return;
+    }
+
+    if (!shouldFetch)
+    {
+        return;
+    }
+
+    NetworkRequest(apiUrl)
+        .concurrent()
+        .onSuccess([](NetworkResult result) -> Outcome {
+            QJsonObject allChannels = result.parseJson()
+                                          .value("data")
+                                          .toObject()
+                                          .value("channel_emotes")
+                                          .toObject();
+
+            std::unordered_map<QString, QJsonObject> parsedMap;
+            parsedMap.reserve(allChannels.size());
+            for (auto it = allChannels.begin(); it != allChannels.end(); ++it)
+            {
+                parsedMap.emplace(it.key(), it.value().toObject());
+            }
+
+            std::vector<PendingChannelRequest> requests;
+            std::vector<std::pair<PendingChannelRequest, QJsonObject>> resolved;
+            auto &cache = getChannelCache();
+            {
+                std::lock_guard<std::mutex> lock(cache.mutex);
+                cache.channelEmotes = std::move(parsedMap);
+                cache.lastFetched = std::chrono::steady_clock::now();
+                cache.inFlight = false;
+                requests.swap(cache.pending);
+                resolved.reserve(requests.size());
+                for (auto &pendingReq : requests)
+                {
+                    auto it = cache.channelEmotes.find(pendingReq.channelId);
+                    QJsonObject obj =
+                        it != cache.channelEmotes.end() ? it->second
+                                                        : QJsonObject{};
+                    resolved.emplace_back(std::move(pendingReq),
+                                          std::move(obj));
+                }
+            }
+
+            for (auto &[pendingReq, obj] : resolved)
+            {
+                auto emoteMap = parseChannelEmotes(obj);
+                finishChannelRequest(std::move(pendingReq),
+                                     std::move(emoteMap));
+            }
+            return Success;
+        })
+        .onError([](NetworkResult result) {
+            std::vector<PendingChannelRequest> requests;
+            auto &cache = getChannelCache();
+            {
+                std::lock_guard<std::mutex> lock(cache.mutex);
+                cache.inFlight = false;
+                requests.swap(cache.pending);
+            }
+
+            auto status = result.status();
+            postToGuiThread([requests = std::move(requests), status]() {
+                for (const auto &pendingReq : requests)
+                {
+                    auto shared = pendingReq.channel.lock();
+                    if (!shared)
+                    {
+                        continue;
+                    }
+                    if (status == 400)
+                    {
+                        if (pendingReq.manualRefresh)
+                        {
+                            shared->addSystemMessage(CHANNEL_HAS_NO_EMOTES);
+                        }
+                    }
+                    else
+                    {
+                        shared->addSystemMessage(
+                            "Failed to fetch Homies channel "
+                            "emotes. (unknown error)");
+                    }
+                }
+            });
         })
         .execute();
 }

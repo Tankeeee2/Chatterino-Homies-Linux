@@ -100,3 +100,32 @@ TEST(Image, CachedFramesClearDisconnectsTimer)
     }
     timer->signal.invoke();
 }
+
+TEST(Image, CachedFramesLazyTimerSync)
+{
+    ImageApplication app;
+    auto *timer = app.emotes.getGIFTimer();
+
+    detail::Frames frames(QList<detail::Frame>{
+        {.image = makePixmap({1, 1}, Qt::red), .duration = 20},
+        {.image = makePixmap({1, 1}, Qt::blue), .duration = 60},
+    });
+    ASSERT_TRUE(frames.animated());
+    EXPECT_EQ(frames.frameIndex(), 0U);
+    EXPECT_TRUE(hasColor(frames, Qt::red));
+
+    // Advance shared timer position without invoking per-frame signal
+    timer->advancePosition(GIF_FRAME_LENGTH);
+    EXPECT_TRUE(hasColor(frames, Qt::red));
+    EXPECT_EQ(frames.frameIndex(), 0U);
+
+    // Next tick crosses frame 0's 20ms duration
+    timer->advancePosition(GIF_FRAME_LENGTH);
+    EXPECT_EQ(frames.frameIndex(), 1U);
+    EXPECT_TRUE(hasColor(frames, Qt::blue));
+
+    // Jumping a full cycle (80ms) lands back cleanly on frame 1
+    timer->advancePosition(80);
+    EXPECT_EQ(frames.frameIndex(), 1U);
+    EXPECT_TRUE(hasColor(frames, Qt::blue));
+}

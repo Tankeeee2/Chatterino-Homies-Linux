@@ -20,6 +20,11 @@ bool UrlPaint::animated() const
     return image_->animated();
 }
 
+size_t UrlPaint::frameIndex() const noexcept
+{
+    return this->image_->frameIndex();
+}
+
 QBrush UrlPaint::asBrush(const QColor userColor, const QRectF drawingRect) const
 {
     if (auto paintPixmap = this->image_->pixmapOrLoad())

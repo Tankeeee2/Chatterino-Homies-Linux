@@ -17,9 +17,14 @@ public:
     void initialize();
 
     pajlada::Signals::NoArgSignal signal;
-    long unsigned position()
+    long unsigned position() const noexcept
     {
         return this->position_;
+    }
+
+    void advancePosition(unsigned long ms = GIF_FRAME_LENGTH) noexcept
+    {
+        this->position_ += ms;
     }
 
     void registerOpenOverlayWindow()

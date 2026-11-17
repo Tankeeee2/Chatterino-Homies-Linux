@@ -15,7 +15,7 @@ namespace chatterino {
 void GIFTimer::initialize()
 {
     this->timer.setInterval(GIF_FRAME_LENGTH);
-    this->timer.setTimerType(Qt::PreciseTimer);
+    this->timer.setTimerType(Qt::CoarseTimer);
 
     getSettings()->animateEmotes.connect([this](bool enabled, auto) {
         if (enabled)
@@ -36,8 +36,7 @@ void GIFTimer::initialize()
             return;
         }
 
-        this->position_ += GIF_FRAME_LENGTH;
-        this->signal.invoke();
+        this->advancePosition();
         getApp()->getWindows()->repaintGifEmotes();
     });
 }

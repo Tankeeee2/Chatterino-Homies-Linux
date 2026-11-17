@@ -33,11 +33,14 @@
 #include <atomic>
 #include <numeric>
 #include <utility>
+#ifdef __GLIBC__
+#    include <malloc.h>
+#endif
 
 // Duration between each check of every Image instance
 const auto IMAGE_POOL_CLEANUP_INTERVAL = std::chrono::minutes(1);
 // Duration since last usage of Image pixmap before expiration of frames
-const auto IMAGE_POOL_IMAGE_LIFETIME = std::chrono::minutes(10);
+const auto IMAGE_POOL_IMAGE_LIFETIME = std::chrono::minutes(3);
 
 namespace {
 
@@ -80,6 +83,7 @@ struct Frames::Storage {
     virtual bool empty() const = 0;
     virtual bool animated() const = 0;
     virtual void start(GIFTimer *timer) = 0;
+    virtual size_t frameIndex() const noexcept = 0;
     virtual std::optional<QPixmap> current() const = 0;
     virtual std::optional<QSize> frameSize() const = 0;
 
@@ -129,23 +133,25 @@ struct Frames::CachedFrames : Storage {
             return;
         }
 
+        this->timer_ = timer;
+        this->lastPosition_ = timer->position();
         this->gifTimerConnection = timer->signal.connect([this] {
             this->advance();
         });
 
-        const auto totalLength =
+        this->totalLength_ =
             std::accumulate(this->items.begin(), this->items.end(), 0UL,
                             [](auto init, auto &&frame) {
                                 return init + frame.duration;
                             });
-        if (totalLength == 0)
+        if (this->totalLength_ == 0)
         {
             this->durationOffset = 0;
         }
         else
         {
-            this->durationOffset =
-                std::min<int>(int(timer->position() % totalLength), 60000);
+            this->durationOffset = std::min<int>(
+                int(this->lastPosition_ % this->totalLength_), 60000);
         }
         this->processOffset();
     }
@@ -156,10 +162,38 @@ struct Frames::CachedFrames : Storage {
         this->processOffset();
     }
 
-    void processOffset()
+    void syncToTimer() const
     {
-        if (this->items.isEmpty())
+        if (this->timer_ == nullptr || !this->animated())
         {
+            return;
+        }
+
+        const auto pos = this->timer_->position();
+        if (pos == this->lastPosition_)
+        {
+            return;
+        }
+
+        auto delta = pos - this->lastPosition_;
+        this->lastPosition_ = pos;
+        if (this->totalLength_ > 0)
+        {
+            delta %= this->totalLength_;
+        }
+        else
+        {
+            delta = std::min<unsigned long>(delta, 60000);
+        }
+        this->durationOffset += static_cast<int>(delta);
+        this->processOffset();
+    }
+
+    void processOffset() const
+    {
+        if (this->items.isEmpty() || this->totalLength_ == 0)
+        {
+            this->durationOffset = 0;
             return;
         }
 
@@ -178,12 +212,23 @@ struct Frames::CachedFrames : Storage {
         }
     }
 
+    size_t frameIndex() const noexcept override
+    {
+        if (this->empty())
+        {
+            return 0;
+        }
+        this->syncToTimer();
+        return static_cast<size_t>(this->index);
+    }
+
     std::optional<QPixmap> current() const override
     {
         if (this->empty())
         {
             return std::nullopt;
         }
+        this->syncToTimer();
         return this->items[this->index].image;
     }
 
@@ -197,8 +242,11 @@ struct Frames::CachedFrames : Storage {
     }
 
     QList<Frame> items;
-    QList<Frame>::size_type index{0};
-    int durationOffset{0};
+    const GIFTimer *timer_{nullptr};
+    unsigned long totalLength_{0};
+    mutable unsigned long lastPosition_{0};
+    mutable QList<Frame>::size_type index{0};
+    mutable int durationOffset{0};
 };
 
 Frames::Frames()
@@ -265,6 +313,10 @@ void Frames::clear()
     {
         DebugCount::decrease(DebugObject::LoadedImage);
     }
+    if (this->animated())
+    {
+        DebugCount::decrease(DebugObject::AnimatedImage);
+    }
     DebugCount::decrease(DebugObject::BytesImageCurrent, this->memoryUsage());
     DebugCount::increase(DebugObject::BytesImageUnloaded, this->memoryUsage());
 
@@ -279,6 +331,11 @@ bool Frames::empty() const
 bool Frames::animated() const
 {
     return this->storage_->animated();
+}
+
+size_t Frames::frameIndex() const noexcept
+{
+    return this->storage_->frameIndex();
 }
 
 std::optional<QPixmap> Frames::current() const
@@ -433,8 +490,17 @@ ImagePtr Image::fromUrl(const Url &url, qreal scale, QSize expectedSize)
 {
     static std::unordered_map<Url, std::weak_ptr<Image>> cache;
     static std::mutex mutex;
+    static size_t nextPruneThreshold = 256;
 
     std::lock_guard<std::mutex> lock(mutex);
+
+    if (cache.size() >= nextPruneThreshold)
+    {
+        std::erase_if(cache, [](const auto &entry) {
+            return entry.second.expired();
+        });
+        nextPruneThreshold = std::max<size_t>(256, cache.size() * 2);
+    }
 
     auto shared = cache[url].lock();
 
@@ -605,6 +671,18 @@ bool Image::animated() const
     }
 
     return this->frames_->animated();
+}
+
+size_t Image::frameIndex() const noexcept
+{
+    assertInGuiThread();
+
+    if (!this->frames_)
+    {
+        return 0;
+    }
+
+    return this->frames_->frameIndex();
 }
 
 int Image::width() const
@@ -847,45 +925,62 @@ void ImageExpirationPool::freeAll()
 
 void ImageExpirationPool::freeOld()
 {
-    std::lock_guard<std::mutex> lock(this->mutex_);
-
     size_t numExpired = 0;
     size_t eligible = 0;
+    size_t left = 0;
 
-    auto now = std::chrono::steady_clock::now();
-    for (auto it = this->allImages_.begin(); it != this->allImages_.end();)
     {
-        auto img = it->second.lock();
-        if (!img)
-        {
-            // This can only really happen from a race condition because ~Image
-            // should remove itself from the ImageExpirationPool automatically.
-            it = this->allImages_.erase(it);
-            continue;
-        }
+        std::lock_guard<std::mutex> lock(this->mutex_);
 
-        if (img->frames_->empty())
+        auto now = std::chrono::steady_clock::now();
+        for (auto it = this->allImages_.begin(); it != this->allImages_.end();)
         {
-            // No frame data, nothing to do
+            auto img = it->second.lock();
+            if (!img)
+            {
+                // This can only really happen from a race condition because ~Image
+                // should remove itself from the ImageExpirationPool automatically.
+                it = this->allImages_.erase(it);
+                continue;
+            }
+
+            if (img->isEmpty())
+            {
+                it = this->allImages_.erase(it);
+                continue;
+            }
+
+            if (!img->frames_ || img->frames_->empty())
+            {
+                // No frame data, nothing to do
+                ++it;
+                continue;
+            }
+
+            ++eligible;
+
+            // Check if image has expired and, if so, expire its frame data
+            auto diff = now - img->lastUsed_;
+            if (diff > IMAGE_POOL_IMAGE_LIFETIME)
+            {
+                ++numExpired;
+                img->expireFrames();
+                // erase without mutex locking issue
+                it = this->allImages_.erase(it);
+                continue;
+            }
+
             ++it;
-            continue;
         }
-
-        ++eligible;
-
-        // Check if image has expired and, if so, expire its frame data
-        auto diff = now - img->lastUsed_;
-        if (diff > IMAGE_POOL_IMAGE_LIFETIME)
-        {
-            ++numExpired;
-            img->expireFrames();
-            // erase without mutex locking issue
-            it = this->allImages_.erase(it);
-            continue;
-        }
-
-        ++it;
+        left = this->allImages_.size();
     }
+
+#    ifdef __GLIBC__
+    if (numExpired > 0)
+    {
+        malloc_trim(0);
+    }
+#    endif
 
 #    ifndef NDEBUG
     qCDebug(chatterinoImage) << "freed frame data for" << numExpired << "/"
@@ -893,7 +988,7 @@ void ImageExpirationPool::freeOld()
 #    endif
     DebugCount::set(DebugObject::LastImageGcExpired, numExpired);
     DebugCount::set(DebugObject::LastImageGcEligible, eligible);
-    DebugCount::set(DebugObject::LastImageGcLeft, this->allImages_.size());
+    DebugCount::set(DebugObject::LastImageGcLeft, left);
 }
 
 #endif

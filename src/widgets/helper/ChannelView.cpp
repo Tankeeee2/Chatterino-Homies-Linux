@@ -430,7 +430,7 @@ void ChannelView::initializeSignals()
 
     this->signalHolder_.managedConnect(
         getApp()->getWindows()->gifRepaintRequested, [&] {
-            if (!this->animationArea_.isEmpty())
+            if (this->isVisible() && !this->animationArea_.isEmpty())
             {
                 this->queueUpdate(this->animationArea_);
             }
@@ -1931,10 +1931,16 @@ void ChannelView::drawMessages(QPainter &painter, const QRect &area)
     // the messages that are left at the end get their buffers reset
     for (size_t i = start; i < messagesSnapshot.size(); ++i)
     {
-        auto it = this->messagesOnScreen_.find(messagesSnapshot[i]);
+        const auto &layout = messagesSnapshot[i];
+        auto it = this->messagesOnScreen_.find(layout);
         if (it != this->messagesOnScreen_.end())
         {
             this->messagesOnScreen_.erase(it);
+        }
+
+        if (layout.get() == end)
+        {
+            break;
         }
     }
 
@@ -3282,6 +3288,7 @@ void ChannelView::hideEvent(QHideEvent * /*event*/)
     }
 
     this->messagesOnScreen_.clear();
+    this->animationArea_ = {};
 }
 
 void ChannelView::showUserInfoPopup(const QString &userName,

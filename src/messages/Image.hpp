@@ -49,6 +49,7 @@ public:
     void clear();
     bool empty() const;
     bool animated() const;
+    size_t frameIndex() const noexcept;
     std::optional<QPixmap> current() const;
     /// Returns the size of the first frame, if one has been loaded.
     std::optional<QSize> frameSize() const;
@@ -105,6 +106,7 @@ public:
     int height() const;
     QSizeF size() const;
     bool animated() const;
+    size_t frameIndex() const noexcept;
 
     bool operator==(const Image &image) = delete;
 

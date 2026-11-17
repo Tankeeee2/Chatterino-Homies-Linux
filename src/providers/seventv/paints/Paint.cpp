@@ -5,8 +5,70 @@
 #include "singletons/Theme.hpp"
 
 #include <private/qpixmapfilter_p.h>
+#include <QCoreApplication>
 #include <QLabel>
 #include <QPainter>
+
+#include <array>
+#include <optional>
+
+namespace {
+
+struct PaintCacheEntry {
+    size_t hash = 0;
+    size_t frameIndex = 0;
+    QPixmap pixmap;
+};
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+constinit std::array<std::optional<PaintCacheEntry>, 64> ANIMATED_PAINT_CACHE;
+
+void ensureCacheCleanupRegistered()
+{
+    static const QCoreApplication *registeredApp = nullptr;
+    auto *app = QCoreApplication::instance();
+    if (app != nullptr && app != registeredApp)
+    {
+        registeredApp = app;
+        QObject::connect(app, &QCoreApplication::aboutToQuit, [] {
+            ANIMATED_PAINT_CACHE.fill(std::nullopt);
+        });
+    }
+}
+
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
+bool getFromCache(size_t hash, size_t frameIndex, QPixmap *pixmap)
+{
+    if (QCoreApplication::closingDown())
+    {
+        return false;
+    }
+    const auto &entry =
+        ANIMATED_PAINT_CACHE[hash % ANIMATED_PAINT_CACHE.size()];
+    if (!entry || entry->hash != hash || entry->frameIndex != frameIndex)
+    {
+        return false;
+    }
+    *pixmap = entry->pixmap;
+    return true;
+}
+
+void putToCache(size_t hash, size_t frameIndex, const QPixmap &pixmap)
+{
+    if (QCoreApplication::closingDown())
+    {
+        return;
+    }
+    ensureCacheCleanupRegistered();
+    ANIMATED_PAINT_CACHE[hash % ANIMATED_PAINT_CACHE.size()] = PaintCacheEntry{
+        .hash = hash,
+        .frameIndex = frameIndex,
+        .pixmap = pixmap,
+    };
+}
+// NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+
+}  // namespace
 
 namespace chatterino {
 
@@ -16,7 +78,26 @@ QPixmap Paint::getPixmap(const QString &text, const QFont &font,
                          QColor userColor, QSizeF size, float scale,
                          float dpr) const
 {
-    QPixmap pixmap((size * dpr).toSize());
+    const bool isAnimated = this->animated();
+    const bool showShadows = getSettings()->displaySevenTVPaintShadows;
+    const QSize targetSize = (size * dpr).toSize();
+
+    size_t hash = 0;
+    size_t frameIdx = 0;
+    if (isAnimated)
+    {
+        frameIdx = this->frameIndex();
+        hash = qHashMulti(0, this->id, text, font, userColor.rgba(),
+                          targetSize.width(), targetSize.height(), scale, dpr,
+                          showShadows);
+        QPixmap cached;
+        if (getFromCache(hash, frameIdx, &cached))
+        {
+            return cached;
+        }
+    }
+
+    QPixmap pixmap(targetSize);
     pixmap.setDevicePixelRatio(dpr);
     pixmap.fill(Qt::transparent);
 
@@ -47,10 +128,9 @@ QPixmap Paint::getPixmap(const QString &text, const QFont &font,
                            QTextOption(Qt::AlignLeft | Qt::AlignTop));
     pixmapPainter.end();
 
-    if (!this->getDropShadows().empty() &&
-        getSettings()->displaySevenTVPaintShadows)
+    if (!this->getDropShadows().empty() && showShadows)
     {
-        QPixmap outMap((size * dpr).toSize());
+        QPixmap outMap(targetSize);
         outMap.setDevicePixelRatio(dpr);
         for (const auto &shadow : this->getDropShadows())
         {
@@ -86,6 +166,11 @@ QPixmap Paint::getPixmap(const QString &text, const QFont &font,
         pixmapPainter.drawText(colonBoundingRect, u":"_s,
                                QTextOption(Qt::AlignLeft | Qt::AlignTop));
         pixmapPainter.end();
+    }
+
+    if (isAnimated)
+    {
+        putToCache(hash, frameIdx, pixmap);
     }
 
     return pixmap;
