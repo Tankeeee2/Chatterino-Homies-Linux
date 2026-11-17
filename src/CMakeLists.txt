@@ -1248,6 +1248,12 @@ if (BUILD_APP)
                 DESTINATION share/icons/hicolor/256x256/apps
                 COMPONENT ${PROJECT_NAME}
                 )
+
+        install(PROGRAMS ${CMAKE_SOURCE_DIR}/scripts/update-chatterino.sh
+                DESTINATION bin
+                RENAME chatterino-update
+                COMPONENT ${PROJECT_NAME}
+                )
     endif ()
 
     if(CHATTERINO_ENABLE_LTO)

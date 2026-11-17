@@ -16,10 +16,13 @@
 #include "util/PostToThread.hpp"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QDesktopServices>
+#include <QDir>
 #include <QMessageBox>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStandardPaths>
 #include <QStringBuilder>
 #include <QtConcurrent>
 #include <semver/semver.hpp>
@@ -143,6 +146,16 @@ const QString &Updates::getOnlineVersion() const
     return this->onlineVersion_;
 }
 
+const QString &Updates::getOnlineCommitHash() const
+{
+    return this->onlineCommitHash_;
+}
+
+const QString &Updates::getOnlineCommitMessage() const
+{
+    return this->onlineCommitMessage_;
+}
+
 void Updates::installUpdates()
 {
     if (this->status_ != UpdateAvailable)
@@ -150,6 +163,11 @@ void Updates::installUpdates()
         assert(false);
         return;
     }
+
+#if defined(Q_OS_LINUX)
+    this->runLinuxUpdater();
+    return;
+#endif
 
     if (Version::instance().isNightly())
     {
@@ -166,14 +184,6 @@ void Updates::installUpdates()
     box->setAttribute(Qt::WA_DeleteOnClose);
     box->open();
     QDesktopServices::openUrl(this->updateExe_);
-#elif defined Q_OS_LINUX
-    QMessageBox *box =
-        new QMessageBox(QMessageBox::Information, "Chatterino Update",
-                        "Automatic updates are currently not available on "
-                        "Linux. Please redownload the app to update.");
-    box->setAttribute(Qt::WA_DeleteOnClose);
-    box->open();
-    QDesktopServices::openUrl(this->updateGuideLink_);
 #elif defined Q_OS_WIN
     if (this->modes.isPortable)
     {
@@ -360,6 +370,69 @@ void Updates::checkForUpdates()
         return;
     }
 
+#if defined(Q_OS_LINUX)
+    this->setStatus_(Searching);
+
+    QUrl url(
+        "https://api.github.com/repos/Tankeeee2/Chatterino-Homies-Linux/commits/main");
+
+    NetworkRequest(url)
+        .timeout(30000)
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", "Chatterino-Homies-Linux")
+        .followRedirects(true)
+        .onSuccess([this](const NetworkResult &result) {
+            const auto object = result.parseJson();
+            if (object.isEmpty())
+            {
+                this->setStatus_(SearchFailed);
+                return;
+            }
+
+            QString remoteSha = object["sha"].toString();
+            if (remoteSha.isEmpty())
+            {
+                this->setStatus_(SearchFailed);
+                return;
+            }
+
+            QString commitMsg =
+                object["commit"].toObject()["message"].toString();
+            QString commitTitle = commitMsg.split('\n').value(0).trimmed();
+
+            QString shortRemoteSha = remoteSha.left(7);
+            this->onlineVersion_ = shortRemoteSha;
+            this->onlineCommitHash_ = shortRemoteSha;
+            this->onlineCommitMessage_ = commitTitle;
+
+            QString localHash = Version::instance().commitHash().trimmed();
+
+            qCDebug(chatterinoUpdate)
+                << "Local commit:" << localHash
+                << "Remote commit:" << remoteSha;
+
+            if (!localHash.isEmpty() &&
+                localHash != "GIT-REPOSITORY-NOT-FOUND" &&
+                (remoteSha.startsWith(localHash, Qt::CaseInsensitive) ||
+                 localHash.startsWith(shortRemoteSha, Qt::CaseInsensitive)))
+            {
+                this->setStatus_(NoUpdateAvailable);
+            }
+            else
+            {
+                this->setStatus_(UpdateAvailable);
+            }
+        })
+        .onError([this](const NetworkResult &result) {
+            qCWarning(chatterinoUpdate)
+                << "Failed to check for updates from GitHub:"
+                << result.formatError();
+            this->setStatus_(SearchFailed);
+        })
+        .execute();
+    return;
+#endif
+
     // See https://github.com/SevenTV/SevenTV/issues/48#issue-2193272289
     // for the proposed structure of the response.
     auto onSuccess = [this](const NetworkResult &result) {
@@ -533,6 +606,19 @@ bool Updates::isDowngrade() const
 
 QString Updates::buildUpdateAvailableText() const
 {
+#if defined(Q_OS_LINUX)
+    if (!this->onlineCommitHash_.isEmpty())
+    {
+        return QString(
+                   "A new update for Chatterino Homies is available!\n\n"
+                   "Commit: %1\n"
+                   "%2\n\n"
+                   "Click 'Install' to open a terminal, update the repository, "
+                   "and recompile/install.")
+            .arg(this->onlineCommitHash_, this->onlineCommitMessage_);
+    }
+#endif
+
     const auto &version = Version::instance();
 
     if (version.isNightly())
@@ -578,5 +664,168 @@ void Updates::setStatus_(Status status)
         });
     }
 }
+
+#if defined(Q_OS_LINUX)
+void Updates::runLinuxUpdater()
+{
+    // 1. Localizar el script de actualización
+    QString scriptPath;
+
+    // A. Comprobar en el repo fuente si estamos ejecutando en desarrollo
+    QString appDir = QCoreApplication::applicationDirPath();
+    QDir dir(appDir);
+    // Si estamos en build/bin, el repo está dos niveles arriba
+    if (dir.cdUp() && dir.cdUp())
+    {
+        QString candidate = dir.filePath("scripts/update-chatterino.sh");
+        if (QFile::exists(candidate))
+        {
+            scriptPath = candidate;
+        }
+    }
+
+    // B. Comprobar en rutas instaladas del sistema
+    if (scriptPath.isEmpty())
+    {
+        QString installedBin =
+            QStandardPaths::findExecutable("chatterino-update");
+        if (!installedBin.isEmpty())
+        {
+            scriptPath = installedBin;
+        }
+    }
+
+    if (scriptPath.isEmpty())
+    {
+        QString sysScript = "/usr/share/chatterino/scripts/update-chatterino.sh";
+        if (QFile::exists(sysScript))
+        {
+            scriptPath = sysScript;
+        }
+    }
+
+    // C. Fallback: extraer script temporal ejecutable si no se encuentra en disco
+    if (scriptPath.isEmpty())
+    {
+        QString tempScript =
+            combinePath(this->paths.miscDirectory, "update-chatterino.sh");
+        QFile file(tempScript);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        {
+            const char embeddedScript[] =
+                "#!/usr/bin/env bash\n"
+                "set -e\n"
+                "REPO_DIR=\"$1\"\n"
+                "if [[ -z \"$REPO_DIR\" ]]; then\n"
+                "    for c in \"$HOME/chatterino7\" \"$HOME/Chatterino-Homies-Linux\" \"/home/juanjo/chatterino7\"; do\n"
+                "        if [[ -d \"$c/.git\" ]]; then REPO_DIR=\"$c\"; break; fi\n"
+                "    done\n"
+                "fi\n"
+                "if [[ -z \"$REPO_DIR\" ]]; then\n"
+                "    REPO_DIR=\"$HOME/.local/src/chatterino7\"\n"
+                "    mkdir -p \"$(dirname \"$REPO_DIR\")\"\n"
+                "    git clone --recurse-submodules https://github.com/Tankeeee2/Chatterino-Homies-Linux.git \"$REPO_DIR\"\n"
+                "fi\n"
+                "cd \"$REPO_DIR\"\n"
+                "echo \"== Chatterino Homies Updater ==\"\n"
+                "echo \">> Updating repository...\"\n"
+                "git pull origin main\n"
+                "git submodule update --init --recursive\n"
+                "echo \">> Building...\"\n"
+                "cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DUSE_PRECOMPILED_HEADERS=OFF -DCHATTERINO_LTO=OFF -DCHATTERINO_UPDATER=ON -DCMAKE_BUILD_TYPE=Release\n"
+                "cmake --build build -j$(nproc)\n"
+                "echo \">> Installing (root password required):\"\n"
+                "sudo cmake --install build\n"
+                "echo \"Update complete! Restarting Chatterino...\"\n"
+                "pkill -x chatterino || pkill -x chatterino-homies || true\n"
+                "nohup /usr/bin/chatterino >/dev/null 2>&1 &\n";
+
+            file.write(embeddedScript);
+            file.flush();
+            file.close();
+            file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                                QFileDevice::ExeOwner | QFileDevice::ReadGroup |
+                                QFileDevice::ExeGroup | QFileDevice::ReadOther |
+                                QFileDevice::ExeOther);
+            scriptPath = tempScript;
+        }
+    }
+
+    // 2. Determinar el directorio del repo preferente
+    QString repoDir;
+    QDir devRepo(appDir);
+    if (devRepo.cdUp() && devRepo.cdUp() && devRepo.exists(".git"))
+    {
+        repoDir = devRepo.canonicalPath();
+    }
+
+    // 3. Lanzar la terminal
+    // Prioridad 1: Omarchy floating terminal launcher si existe
+    QString omarchyLauncher = QStandardPaths::findExecutable(
+        "omarchy-launch-floating-terminal-with-presentation");
+    if (!omarchyLauncher.isEmpty())
+    {
+        QString command = QString("\"%1\"").arg(scriptPath);
+        if (!repoDir.isEmpty())
+        {
+            command += QString(" \"%1\"").arg(repoDir);
+        }
+        if (QProcess::startDetached(omarchyLauncher, {command}))
+        {
+            return;
+        }
+    }
+
+    // Prioridad 2: Terminales estándar
+    struct TermDef {
+        QString binary;
+        QStringList args;
+    };
+
+    std::vector<TermDef> terminals;
+    QString envTerm = qEnvironmentVariable("TERMINAL");
+    if (!envTerm.isEmpty())
+    {
+        terminals.push_back({envTerm, {"-e"}});
+    }
+    terminals.push_back(
+        {"xdg-terminal-exec", {"--title=Actualizando Chatterino Homies", "-e"}});
+    terminals.push_back(
+        {"ghostty", {"--title=Actualizando Chatterino Homies", "-e"}});
+    terminals.push_back({"kitty", {"--title=Actualizando Chatterino Homies"}});
+    terminals.push_back(
+        {"alacritty", {"--title", "Actualizando Chatterino Homies", "-e"}});
+    terminals.push_back({"foot", {"--title=Actualizando Chatterino Homies"}});
+    terminals.push_back(
+        {"konsole", {"--title", "Actualizando Chatterino Homies", "-e"}});
+    terminals.push_back(
+        {"xterm", {"-title", "Actualizando Chatterino Homies", "-e"}});
+
+    for (const auto &term : terminals)
+    {
+        QString termExe = QStandardPaths::findExecutable(term.binary);
+        if (!termExe.isEmpty())
+        {
+            QStringList fullArgs = term.args;
+            fullArgs << scriptPath;
+            if (!repoDir.isEmpty())
+            {
+                fullArgs << repoDir;
+            }
+            if (QProcess::startDetached(termExe, fullArgs))
+            {
+                return;
+            }
+        }
+    }
+
+    QMessageBox *box = new QMessageBox(
+        QMessageBox::Warning, "Chatterino Update",
+        "Could not detect a terminal emulator to run the updater.\n"
+        "Please run 'chatterino-update' or 'git pull && makepkg -si' manually.");
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->open();
+}
+#endif
 
 }  // namespace chatterino

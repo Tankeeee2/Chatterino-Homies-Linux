@@ -64,6 +64,9 @@ package() {
     install -Dm755 build/bin/chatterino-homies "${pkgdir}/usr/bin/chatterino-homies"
     ln -sf chatterino-homies "${pkgdir}/usr/bin/chatterino"
 
+    # Install updater script
+    install -Dm755 scripts/update-chatterino.sh "${pkgdir}/usr/bin/chatterino-update"
+
     # Install desktop file
     install -Dm644 resources/com.chatterino.chatterino.desktop \
         "${pkgdir}/usr/share/applications/com.chatterino.chatterino.desktop"

@@ -52,6 +52,8 @@ public:
     void checkForUpdates();
     const QString &getCurrentVersion() const;
     const QString &getOnlineVersion() const;
+    const QString &getOnlineCommitHash() const;
+    const QString &getOnlineCommitMessage() const;
     void installUpdates();
     Status getStatus() const;
 
@@ -69,6 +71,8 @@ public:
 private:
     QString currentVersion_;
     QString onlineVersion_;
+    QString onlineCommitHash_;
+    QString onlineCommitMessage_;
     Status status_ = None;
     bool isDowngrade_{};
 
@@ -77,6 +81,10 @@ private:
     QString updateGuideLink_;
 
     void setStatus_(Status status);
+
+#if defined(Q_OS_LINUX)
+    void runLinuxUpdater();
+#endif
 
     std::vector<std::unique_ptr<pajlada::Signals::ScopedConnection>>
         managedConnections;
