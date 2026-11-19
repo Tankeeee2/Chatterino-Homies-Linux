@@ -78,6 +78,8 @@ fi
 
 echo -e "${YELLOW}>> Aplicando git pull origin main...${NC}"
 git pull --rebase origin main || git pull origin main
+echo -e "${YELLOW}>> Sincronizando y actualizando submódulos...${NC}"
+git submodule sync --recursive
 git submodule update --init --recursive
 
 if [[ "$HAS_STASH" -eq 1 ]]; then

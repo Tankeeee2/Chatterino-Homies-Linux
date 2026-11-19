@@ -730,6 +730,7 @@ void Updates::runLinuxUpdater()
                 "echo \"== Chatterino Homies Updater ==\"\n"
                 "echo \">> Updating repository...\"\n"
                 "git pull origin main\n"
+                "git submodule sync --recursive\n"
                 "git submodule update --init --recursive\n"
                 "echo \">> Building...\"\n"
                 "cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DUSE_PRECOMPILED_HEADERS=OFF -DCHATTERINO_LTO=OFF -DCHATTERINO_UPDATER=ON -DCMAKE_BUILD_TYPE=Release\n"
