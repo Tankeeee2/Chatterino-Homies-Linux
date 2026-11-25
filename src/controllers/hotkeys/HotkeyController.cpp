@@ -490,7 +490,7 @@ void HotkeyController::addDefaults(std::set<QString> &addedHotkeys)
     // window
     {
         this->tryAddDefault(addedHotkeys, HotkeyCategory::Window,
-                            QKeySequence("Ctrl+P"), "openSettings",
+                            QKeySequence("Ctrl+,"), "openSettings",
                             std::vector<QString>(), "open settings");
         this->tryAddDefault(addedHotkeys, HotkeyCategory::Window,
                             QKeySequence("Ctrl+T"), "newSplit",
